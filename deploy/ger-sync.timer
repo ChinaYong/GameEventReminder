@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily Game Event Sync Timer (Zero-Resident Mode)
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

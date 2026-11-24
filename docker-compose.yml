@@ -1,0 +1,14 @@
+services:
+  ger:
+    build: .
+    container_name: game-event-reminder
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./config.yaml:/app/config/config.yaml:ro
+      - ./data:/app/data
+    ports:
+      # 仅绑定本机回环，建议用 Caddy/Nginx 反代 HTTPS 或配合 Tailscale 访问
+      - "127.0.0.1:8765:8765"
+    mem_limit: 128m

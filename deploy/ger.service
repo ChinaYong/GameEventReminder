@@ -1,0 +1,16 @@
+[Unit]
+Description=Game Event Reminder Daemon (API + Scheduler)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/game-event-reminder
+EnvironmentFile=-/opt/game-event-reminder/.env
+ExecStart=/opt/game-event-reminder/.venv/bin/ger -c /opt/game-event-reminder/config.yaml serve
+Restart=on-failure
+RestartSec=10
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target

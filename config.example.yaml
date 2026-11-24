@@ -1,0 +1,228 @@
+# Game Event Reminder (ger) 配置文件模板
+# 会自动从项目根目录（或 config.yaml 同目录）的 .env 文件读取环境变量
+# 支持使用 ${ENV_VAR} 或 ${ENV_VAR:-default} 注入密钥（变量未设置或为空时使用 default）
+
+timezone: "Asia/Shanghai"
+default_region: "cn"          # 默认仅收集国服（cn，中国大陆服 UTC+8）排期；单数据源可覆盖 region
+ignore_ended_events: true     # 代码层硬性拦截已结束的历史活动，防止旧公告或过期数据入库
+cleanup_ended_after_days: 3   # 活动结束 3 天后自动清理数据库记录与关联提醒（设为 0 结束即删，-1 禁用自动清理）
+keep_sync_runs: 30            # 仅保留最近 30 条同步历史日志
+db_path: "./data/ger.db"
+
+# 全局监测游戏主开关（规范中文游戏名；留空 [] 表示不启用全局白名单）
+# - 决定所有数据源采集哪些游戏（各源通过自身映射层将外部 ID/目录 映射为这里的规范名称）
+# - 移出列表的游戏：已入库的存量活动会自动静默（不再发送通知），但不提前删除，等待自然结束后由 cleanup 清理
+# - 重新加回列表：自动恢复因移出名单而被静默的活动（保留人工单独静音的条目）
+watched_games:
+  - "原神"
+  - "崩坏：星穹铁道"
+  - "绝区零"
+  - "鸣潮"
+  - "明日方舟"
+
+# 全局允许收集与通知的标准活动类别（删掉任意项即可全局屏蔽该类通知）
+#   - ingame_event   : 游戏内限时道具/抽卡资源活动
+#   - web_event      : 官方网页/H5 道具活动（严格排除纯转发抽奖营销）
+#   - checkin_redeem : 已公布的前瞻/官方限时兑换码（含具体兑换码与截止时间）与签到福利；不含纯前瞻直播预告
+#   - banner         : 卡池更新（UP 池开始与结束）
+#   - version        : 大版本更新与停服维护
+enabled_event_types:
+  - "ingame_event"
+  - "web_event"
+  - "checkin_redeem"
+  - "banner"
+  - "version"
+
+# 全局通知总开关与定时汇总队列配置
+notifications:
+  enabled: true                   # 全局通知总开关：设为 false 暂停所有活动推送
+  mode: "digest"                  # digest=收集入队后按每日固定时间合并为 1 条汇总发送 | realtime=到点逐条即时发送
+  digest_cron: "15 12 * * *"      # 统一发送时间（默认每天 12:15 按上方 timezone 汇总推送）
+  digest_lookback_hours: 26       # 收集过去 26 小时内到达触发节点且尚未结束的活动进入队列
+
+scheduler:
+  # 每天定点同步 Cron 表达式（按上方 timezone 计算）
+  sync_cron: "0 8 * * *"
+  # 守护进程模式下，每多少秒扫描一次 SQLite 将到期节点放入待发送队列
+  dispatch_interval_seconds: 60
+  # 当同步出现失败或 AI 提取出 needs_review 事件时，推送一条低优先级摘要通知（同样受 notifications.enabled 控制）
+  notify_on_sync_issues: true
+
+api:
+  enabled: true
+  host: "127.0.0.1"        # 如需外网访问建议配 0.0.0.0 并通过 Nginx/Caddy 反代 HTTPS
+  port: 8765
+  auth_token: "${GER_API_TOKEN:-change-me-strong-token}"
+
+# 去重策略配置（规则规范化 + 可选联网 AI 审查灰色地带疑似重复）
+dedup:
+  auto_merge_similarity: 0.80      # 规范化标题相似度 >= 0.80 且时间兼容时直接合并（不消耗 AI）
+  gray_zone_min_similarity: 0.25   # 0.25~0.80 或同类别起止时间极接近（<=12h）时视为疑似重复
+  ai_review_enabled: false         # 开启后仅在命中疑似重复时才调用联网 AI 核实（如别名/简称卡池）
+  llm_provider: "gemini-search"    # 可填 Gemini（自带 Google Search）或 openai-main（需配下方 search_providers）
+  search_providers: []             # 使用 openai-main 时填入 ["tavily"] 或 ["exa"]
+  max_search_results: 3
+
+# 全局默认提醒节点规则（负数为提前，0m 为准点；到点后加入待发送队列，等 12:15 统一合并发送）
+reminders:
+  start_offsets: ["-24h"]         # 活动开始前 24 小时入队
+  end_offsets: ["-24h"]           # 活动结束前 24 小时入队
+  grace_period_minutes: 120       # realtime 模式下的离线宽限窗口
+
+# 按活动类别定制提醒节点（优先级：单游戏 game_reminders > 按类别 type_reminders > 全局 reminders）
+type_reminders:
+  checkin_redeem:
+    start_offsets: ["0m"]         # 搜到已公布的新兑换码/福利立即入队，最近一次 12:15 汇总推送
+    end_offsets: ["-24h"]         # 兑换码/签到截止前 24 小时再次提醒
+    grace_period_minutes: 120
+  version:
+    start_offsets: ["-24h"]       # 大版本更新前 24 小时入队提醒
+    end_offsets: []               # 版本周期本身不需要结束前提醒
+    grace_period_minutes: 120
+
+# 可按游戏名单独覆盖提醒规则（可选）
+game_reminders: {}
+  # "原神":
+  #   start_offsets: ["-1h", "0m"]
+  #   end_offsets: ["-48h", "-6h"]
+
+# 通知通道配置（可同时启用多个）
+notifiers:
+  - id: "my-ntfy"
+    type: "ntfy"
+    enabled: true
+    server: "https://ntfy.sh"     # 可改为自建 ntfy 地址
+    topic: "${NTFY_TOPIC:-my-game-events-secret}"
+    token: "${NTFY_TOKEN:-}"      # 自建鉴权可选
+    priority: 3                   # 1(min) - 5(max)
+    tags: ["video_game", "alarm_clock"]
+
+  - id: "my-bark"
+    type: "bark"
+    enabled: false
+    server: "https://api.day.app" # 可改为自建 Bark 地址
+    device_key: "${BARK_DEVICE_KEY:-}"
+    group: "GameEvents"
+    sound: "bell"
+    level: "timeSensitive"        # active | timeSensitive | passive | critical
+
+# 联网搜索提供方（供通用 OpenAI 兼容模型搭配使用）
+search_providers:
+  - id: "tavily"
+    type: "tavily"
+    api_key: "${TAVILY_API_KEY:-}"
+
+  - id: "exa"
+    type: "exa"
+    api_key: "${EXA_API_KEY:-}"
+
+# 大模型提供方（支持通用 OpenAI 兼容接口 & Gemini 原生接口）
+llm_providers:
+  - id: "openai-main"
+    type: "openai_compat"
+    base_url: "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
+    api_key: "${OPENAI_API_KEY:-}"
+    model: "${OPENAI_MODEL:-gpt-4o-mini}"
+    timeout_seconds: 90
+
+  - id: "gemini-search"
+    type: "gemini"
+    api_key: "${GEMINI_API_KEY:-}"
+    model: "${GEMINI_MODEL:-gemini-2.5-flash}"
+    use_google_search: true       # 开启 Gemini 原生 Google Search 联网检索（两阶段结构化提取）
+    timeout_seconds: 90
+
+# 数据源插件配置（按需启停与扩展）
+sources:
+  # 1. 结构化第三方源：gameg.site (GitHub 开源 YAML 排期，零 Token 消耗、精确到分钟，权威度高于 AI 源)
+  - id: "gameg-site"
+    type: "gameg_site"
+    enabled: true
+    options:
+      repo: "Oven2002/game-event-gantt"
+      branch: "main"
+      # github_token: "${GITHUB_TOKEN:-}"  # 可选，配置后提高 GitHub API 限额
+      # 无需重复填写 games：默认自动根据顶层 watched_games 反查下方 game_name_map 决定拉取目录
+      # 如需在该源内进一步缩小子集，可取消注释并指定目录 slug：
+      # games: ["genshin-impact", "arknights"]
+      # 仅保留指定区服（默认继承全局 default_region，即仅国服 ["cn"]）
+      regions: ["cn"]
+      # 默认继承全局 enabled_event_types；自动将 event->ingame_event、livestream->checkin_redeem、maintenance->version
+      # include_types: ["ingame_event", "checkin_redeem", "banner", "version"]
+      include_versions: true
+      lookback_days: 0
+      # 源级映射表：将仓库 data/<slug>/ 映射为顶层 watched_games 中的规范游戏名
+      game_name_map:
+        genshin-impact: "原神"
+        honkai-star-rail: "崩坏：星穹铁道"
+        zenless-zone-zero: "绝区零"
+        ZenlessZoneZero: "绝区零"
+        wuthering-waves: "鸣潮"
+        arknights: "明日方舟"
+        arknights-endfield: "明日方舟：终末地"
+        azur-lane: "碧蓝航线"
+        neverness-to-everness: "异环"
+
+  # 2. AI 联网收集源（示例 A：OpenAI 兼容接口 + Tavily/Exa 联网搜索，补齐官方网页道具活动/兑换码或 gameg 未收录的游戏）
+  - id: "ai-tavily-example"
+    type: "ai_collector"
+    enabled: false
+    options:
+      game: "绝区零"
+      llm_provider: "openai-main"
+      # 支持配置一个或多个搜索引擎（会合并去重结果后交给 AI 整理）
+      search_providers: ["tavily"]
+      search_queries:
+        - "绝区零 国服 最新活动 网页活动 兑换码 时间 公告"
+      max_search_results: 5
+      # 也可同时附带指定官方公告 URL，抓取正文与搜索结果一起交给 AI 分析
+      urls: []
+      # 可按需仅让 AI 补抓 gameg.site 不含的类别（如 web_event、checkin_redeem）
+      # include_types: ["ingame_event", "web_event", "checkin_redeem"]
+      extra_instructions: "重点补充官方网页/H5道具活动与兑换码截止时间，忽略纯社区抽奖营销。"
+
+  # 3. AI 联网收集源（示例 B：Gemini 原生 Google Search 联网搜索）
+  - id: "ai-gemini-example"
+    type: "ai_collector"
+    enabled: false
+    options:
+      game: "鸣潮"
+      llm_provider: "gemini-search"
+      search_queries:
+        - "鸣潮 国服 当前及即将开始的限时活动 网页活动 前瞻直播兑换码"
+      extra_instructions: "优先采信官方公告与权威维基，给出精确到分钟的北京时间（+08:00）。"
+
+  # 4. 通用 iCalendar (.ics) 社区日历订阅源（零 Token，可直连 hoyo_calendar / ArkBulletinGPT 等开源日历）
+  - id: "ical-arknights-example"
+    type: "ical_feed"
+    enabled: false
+    options:
+      game: "明日方舟"
+      # 示例：替换为实际可用的 .ics 订阅链接（如 ArkBulletinGPT 或 Trrrrw/hoyo_calendar 生成的订阅地址）
+      url: "https://example.com/arknights_events.ics"
+      default_type: "ingame_event"
+      exclude_keywords: ["生日", "维护补偿"]
+      lookback_days: 0
+
+  # 5. 米游社官方公告/活动静态接口（无需登录，gids: 1=崩坏3, 2=原神, 6=星铁, 8=绝区零）
+  - id: "miyoushe-genshin-example"
+    type: "miyoushe_news"
+    enabled: false
+    options:
+      gids: 2
+      game: "原神"
+      llm_provider: "openai-main"
+      news_types: [1, 2]           # 1=官方公告, 2=官方活动（涵盖网页活动与前瞻公告）
+      page_size: 15
+      # include_types: ["web_event", "checkin_redeem", "ingame_event"]
+
+  # 6. 通用 RSS / Atom 订阅源（可接官方 RSS 或自建 RSSHub，再用 AI 从公告正文提取时间）
+  - id: "rss-example"
+    type: "rss_ai"
+    enabled: false
+    options:
+      game: "Steam-Example"
+      feed_url: "https://store.steampowered.com/feeds/news/app/730/"
+      llm_provider: "openai-main"
+      max_items: 10
+      keyword_filter: ["活动", "Event", "Update", "Season"]

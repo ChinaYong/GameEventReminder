@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game Event Reminder - 游戏活动管理</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #263348;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+      --cyan: #06b6d4;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button, input, select, textarea {
+      font: inherit;
+      color: var(--text);
+    }
+    .container {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 20px 16px 48px;
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .brand p {
+      margin: 2px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 7px 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+    }
+    .btn:hover { background: var(--panel-2); border-color: #475569; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .btn-danger { border-color: rgba(239,68,68,0.45); color: #fca5a5; }
+    .btn-danger:hover { background: rgba(239,68,68,0.16); border-color: var(--danger); }
+    .btn-sm { padding: 4px 9px; font-size: 12px; border-radius: 6px; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); }
+    .stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+    }
+    .filters select, .filters input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    .filters select:focus, .filters input:focus { border-color: var(--primary); }
+    .filters input[type="text"] { min-width: 180px; flex: 1; }
+    .check-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .event-list {
+      display: grid;
+      gap: 10px;
+    }
+    .event-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.15s;
+    }
+    .event-card:hover { border-color: #475569; }
+    .event-card.urgent { border-left: 3px solid var(--warning); }
+    .event-card.muted, .event-card.done { opacity: 0.68; }
+    .event-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .event-title-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+    }
+    .event-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .b-game { background: rgba(59,130,246,0.16); color: #93c5fd; border-color: rgba(59,130,246,0.35); }
+    .b-ingame_event { background: rgba(16,185,129,0.16); color: #6ee7b7; border-color: rgba(16,185,129,0.35); }
+    .b-web_event { background: rgba(6,182,212,0.16); color: #67e8f9; border-color: rgba(6,182,212,0.35); }
+    .b-checkin_redeem { background: rgba(245,158,11,0.16); color: #fcd34d; border-color: rgba(245,158,11,0.35); }
+    .b-banner { background: rgba(139,92,246,0.18); color: #c4b5fd; border-color: rgba(139,92,246,0.38); }
+    .b-version { background: rgba(236,72,153,0.16); color: #f9a8d4; border-color: rgba(236,72,153,0.35); }
+    .b-review { background: rgba(239,68,68,0.18); color: #fca5a5; border-color: rgba(239,68,68,0.4); }
+    .b-locked { background: rgba(148,163,184,0.15); color: #cbd5e1; border-color: rgba(148,163,184,0.3); }
+    .b-status { background: rgba(148,163,184,0.15); color: #cbd5e1; }
+
+    .countdown {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--cyan);
+      white-space: nowrap;
+    }
+    .countdown.urgent { color: var(--warning); }
+    .countdown.ended { color: var(--muted); }
+
+    .event-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .event-notes {
+      font-size: 12px;
+      color: #cbd5e1;
+      background: rgba(15,23,42,0.55);
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+    .event-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(51,65,85,0.65);
+    }
+    .event-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 48px 16px;
+      background: var(--panel);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.76);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    }
+    .modal h2 { margin: 0 0 14px; font-size: 17px; }
+    .form-grid { display: grid; gap: 12px; }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 560px) { .form-row-2 { grid-template-columns: 1fr; } }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 8px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--primary); }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .error-text { color: #fca5a5; font-size: 13px; margin-top: 6px; min-height: 18px; }
+
+    .reminder-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .reminder-table th, .reminder-table td {
+      text-align: left;
+      padding: 7px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .reminder-table th { color: var(--muted); font-weight: 500; }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      max-width: 380px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      display: none;
+      z-index: 80;
+    }
+    .toast.show { display: block; }
+    .toast.error { border-left-color: var(--danger); }
+    .toast.success { border-left-color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <h1>Game Event Reminder</h1>
+        <p id="subtitle">国服游戏活动排期与节点提醒管理</p>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="openEditModal()">+ 新增活动</button>
+        <button class="btn" id="btnSync" onclick="triggerSync()">立即同步</button>
+        <button class="btn" onclick="openQueueModal()">待发队列</button>
+        <button class="btn" id="btnDispatch" onclick="triggerDispatch()">立即汇总推送</button>
+        <button class="btn" onclick="triggerTestNotify()">测试通知</button>
+        <button class="btn" onclick="triggerCleanup()">清理过期</button>
+        <a class="btn" href="/docs" target="_blank" rel="noopener">API 文档</a>
+        <button class="btn" id="btnLogout" style="display:none" onclick="logout()">退出认证</button>
+      </div>
+    </header>
+
+    <section class="stats">
+      <div class="stat-card">
+        <div class="stat-label">当前展示活动</div>
+        <div class="stat-value" id="statTotal">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">24 小时内截止</div>
+        <div class="stat-value" id="statUrgent" style="color:var(--warning)">-</div>
+      </div>
+      <div class="stat-card" style="cursor:pointer" onclick="openQueueModal()" title="点击预览每日汇总通知内容">
+        <div class="stat-label">待发送队列（点击预览）</div>
+        <div class="stat-value" id="statQueue" style="color:var(--cyan)">-</div>
+        <div class="stat-sub" id="statQueueSub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">待人工核对</div>
+        <div class="stat-value" id="statReview" style="color:#fca5a5">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">最近同步时间</div>
+        <div class="stat-value" id="statLastSync" style="font-size:15px;margin-top:6px">-</div>
+        <div class="stat-sub" id="statSyncDetail"></div>
+      </div>
+    </section>
+
+    <section class="filters">
+      <select id="filterGame" onchange="renderEvents()">
+        <option value="">全部游戏</option>
+      </select>
+      <select id="filterType" onchange="renderEvents()">
+        <option value="">全部类别</option>
+        <option value="ingame_event">游戏内活动</option>
+        <option value="web_event">官方网页活动</option>
+        <option value="checkin_redeem">兑换码 / 签到福利</option>
+        <option value="banner">卡池更新</option>
+        <option value="version">大版本更新</option>
+      </select>
+      <select id="filterStatus" onchange="renderEvents()">
+        <option value="">全部状态</option>
+        <option value="active">进行中 (active)</option>
+        <option value="muted">已静音 (muted)</option>
+        <option value="done">已完成 (done)</option>
+      </select>
+      <input type="text" id="filterSearch" placeholder="搜索活动标题或备注..." oninput="renderEvents()" />
+      <label class="check-label">
+        <input type="checkbox" id="filterReviewOnly" onchange="renderEvents()" />
+        仅看核对项
+      </label>
+      <label class="check-label">
+        <input type="checkbox" id="filterIncludePast" onchange="loadEvents()" />
+        包含已结束
+      </label>
+    </section>
+
+    <main id="eventList" class="event-list">
+      <div class="empty">正在加载活动数据...</div>
+    </main>
+  </div>
+
+  <!-- Auth Modal -->
+  <div class="modal-backdrop" id="authModal">
+    <div class="modal" style="max-width:400px">
+      <h2>访问认证</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px">
+        请输入 <code>config.yaml</code> / <code>.env</code> 中配置的 <code>GER_API_TOKEN</code>。
+      </p>
+      <form onsubmit="submitAuth(event)">
+        <div class="field">
+          <label for="tokenInput">API Token</label>
+          <input type="password" id="tokenInput" placeholder="输入访问令牌" autocomplete="current-password" required />
+        </div>
+        <div class="error-text" id="authError"></div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary" id="btnLogin">验证并进入</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Event Modal -->
+  <div class="modal-backdrop" id="editModal">
+    <div class="modal">
+      <h2 id="editModalTitle">新增活动</h2>
+      <form id="editForm" onsubmit="saveEvent(event)">
+        <input type="hidden" id="editId" />
+        <div class="form-grid">
+          <div class="form-row-2">
+            <div class="field">
+              <label for="editGame">游戏名称 *</label>
+              <input type="text" id="editGame" required placeholder="例如：原神" />
+            </div>
+            <div class="field">
+              <label for="editType">活动类别 *</label>
+              <select id="editType">
+                <option value="ingame_event">游戏内活动 (ingame_event)</option>
+                <option value="web_event">官方网页活动 (web_event)</option>
+                <option value="checkin_redeem">兑换码/签到福利 (checkin_redeem)</option>
+                <option value="banner">卡池更新 (banner)</option>
+                <option value="version">大版本更新 (version)</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="editTitle">活动标题 *</label>
+            <input type="text" id="editTitle" required placeholder="输入清晰的活动名称" />
+          </div>
+          <div class="form-row-2">
+            <div class="field">
+              <label for="editStart">开始时间（本地时间）</label>
+              <input type="datetime-local" id="editStart" />
+            </div>
+            <div class="field">
+              <label for="editEnd">结束时间（本地时间，单点活动可留空）</label>
+              <input type="datetime-local" id="editEnd" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="editUrl">来源链接</label>
+            <input type="url" id="editUrl" placeholder="https://..." />
+          </div>
+          <div class="field">
+            <label for="editNotes">备注</label>
+            <textarea id="editNotes" rows="2" placeholder="可选备注，如奖励说明或兑换码"></textarea>
+          </div>
+          <div id="editExtraFlags" style="display:none">
+            <div class="form-row-2">
+              <div class="field">
+                <label for="editStatus">状态</label>
+                <select id="editStatus">
+                  <option value="active">进行中 (active)</option>
+                  <option value="muted">已静音 (muted)</option>
+                  <option value="done">已完成 (done)</option>
+                </select>
+              </div>
+              <div class="field" style="display:flex;flex-direction:column;justify-content:flex-end;gap:6px">
+                <label class="check-label">
+                  <input type="checkbox" id="editLocked" checked />
+                  人工锁定（防止次日同步覆盖）
+                </label>
+                <label class="check-label">
+                  <input type="checkbox" id="editNeedsReview" />
+                  标记为待人工核对
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="error-text" id="editError"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn" onclick="closeModal('editModal')">取消</button>
+          <button type="submit" class="btn btn-primary" id="btnSaveEvent">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reminders Detail Modal -->
+  <div class="modal-backdrop" id="detailModal">
+    <div class="modal">
+      <h2 id="detailTitle">提醒节点详情</h2>
+      <div id="detailMeta" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
+      <div id="detailBody"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closeModal('detailModal')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Digest Queue Preview Modal -->
+  <div class="modal-backdrop" id="queueModal">
+    <div class="modal" style="max-width:600px">
+      <h2>待发送通知队列预览</h2>
+      <div id="queueMeta" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
+      <pre id="queuePreview" style="white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;margin:0"></pre>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closeModal('queueModal')">关闭</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal('queueModal');triggerDispatch();">立即发送汇总</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const TOKEN_KEY = "ger_api_token";
+    const TYPE_LABELS = {
+      ingame_event: "游戏内活动",
+      web_event: "网页活动",
+      checkin_redeem: "兑换码/签到福利",
+      banner: "卡池更新",
+      version: "大版本更新",
+    };
+    const STATUS_LABELS = {
+      active: "进行中",
+      muted: "已静音",
+      done: "已完成",
+    };
+    const REMINDER_STATUS_LABELS = {
+      pending: "未到点",
+      queued: "待发送队列",
+      sent: "已发送",
+      skipped: "已跳过",
+      muted: "已静音",
+      failed: "发送失败",
+    };
+
+    let allEvents = [];
+    let authRequired = true;
+
+    function getToken() {
+      return localStorage.getItem(TOKEN_KEY) || "";
+    }
+
+    function showToast(msg, kind = "info") {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.className = "toast show " + kind;
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.classList.remove("show"), 3600);
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add("open"); }
+    function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+
+    async function apiFetch(path, options = {}) {
+      const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+      const token = getToken();
+      if (token) headers["Authorization"] = "Bearer " + token;
+      const resp = await fetch(path, Object.assign({}, options, { headers }));
+      if (resp.status === 401) {
+        openModal("authModal");
+        throw new Error("未认证或 Token 无效");
+      }
+      if (!resp.ok) {
+        let detail = `HTTP ${resp.status}`;
+        try {
+          const data = await resp.json();
+          if (data.detail) detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+        } catch {}
+        throw new Error(detail);
+      }
+      return resp.json();
+    }
+
+    async function checkAuthAndBoot() {
+      try {
+        const res = await fetch("/auth/verify", {
+          headers: getToken() ? { Authorization: "Bearer " + getToken() } : {},
+        });
+        if (res.status === 401) {
+          openModal("authModal");
+          setTimeout(() => document.getElementById("tokenInput").focus(), 50);
+          return;
+        }
+        const info = await res.json();
+        authRequired = !!info.auth_required;
+        document.getElementById("btnLogout").style.display = authRequired ? "inline-block" : "none";
+        closeModal("authModal");
+        await Promise.all([loadEvents(), loadLatestSync(), loadQueueStatus()]);
+      } catch (err) {
+        showToast("无法连接服务：" + err.message, "error");
+      }
+    }
+
+    async function submitAuth(e) {
+      e.preventDefault();
+      const input = document.getElementById("tokenInput");
+      const errEl = document.getElementById("authError");
+      const btn = document.getElementById("btnLogin");
+      const candidate = input.value.trim();
+      errEl.textContent = "";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/auth/verify", {
+          headers: { Authorization: "Bearer " + candidate },
+        });
+        if (res.status === 401) {
+          errEl.textContent = "Token 不正确，请检查 .env 中的 GER_API_TOKEN。";
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        localStorage.setItem(TOKEN_KEY, candidate);
+        input.value = "";
+        closeModal("authModal");
+        document.getElementById("btnLogout").style.display = "inline-block";
+        showToast("认证成功", "success");
+        await Promise.all([loadEvents(), loadLatestSync(), loadQueueStatus()]);
+      } catch (err) {
+        errEl.textContent = "验证失败：" + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem(TOKEN_KEY);
+      allEvents = [];
+      document.getElementById("eventList").innerHTML = '<div class="empty">请重新认证</div>';
+      openModal("authModal");
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return "-";
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function toDatetimeLocalValue(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "";
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function fromDatetimeLocalValue(val) {
+      if (!val) return null;
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+
+    function computeCountdown(ev) {
+      const now = Date.now();
+      const start = ev.start_time ? new Date(ev.start_time).getTime() : null;
+      const end = ev.end_time ? new Date(ev.end_time).getTime() : null;
+
+      const fmtDur = (ms) => {
+        const mins = Math.max(0, Math.floor(ms / 60000));
+        const days = Math.floor(mins / 1440);
+        const hours = Math.floor((mins % 1440) / 60);
+        const m = mins % 60;
+        if (days > 0) return `${days}天 ${hours}小时`;
+        if (hours > 0) return `${hours}小时 ${m}分`;
+        return `${m}分钟`;
+      };
+
+      if (end && end <= now) return { text: "已结束", cls: "ended", urgent: false };
+      if (start && start > now) return { text: `${fmtDur(start - now)}后开始`, cls: "", urgent: false };
+      if (end) {
+        const rem = end - now;
+        const urgent = rem <= 24 * 3600 * 1000;
+        return { text: `剩余 ${fmtDur(rem)}`, cls: urgent ? "urgent" : "", urgent };
+      }
+      if (start && start <= now) return { text: "节点已过", cls: "ended", urgent: false };
+      return { text: "-", cls: "", urgent: false };
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    async function loadEvents() {
+      const includePast = document.getElementById("filterIncludePast").checked;
+      try {
+        allEvents = await apiFetch(`/events?include_past=${includePast}&limit=500`);
+        refreshGameDropdown();
+        renderEvents();
+      } catch (err) {
+        if (!String(err.message).includes("未认证")) {
+          showToast("加载活动失败：" + err.message, "error");
+        }
+      }
+    }
+
+    async function loadLatestSync() {
+      try {
+        const data = await apiFetch("/sync/latest");
+        const el = document.getElementById("statLastSync");
+        const sub = document.getElementById("statSyncDetail");
+        if (!data.finished_at) {
+          el.textContent = "尚未同步";
+          sub.textContent = "点击右上角「立即同步」抓取";
+          return;
+        }
+        el.textContent = formatDateTime(data.finished_at);
+        const srcs = (data.report && data.report.sources) || [];
+        const okCount = srcs.filter((s) => s.ok).length;
+        sub.textContent = `数据源 ${okCount}/${srcs.length} 正常`;
+      } catch {}
+    }
+
+    function refreshGameDropdown() {
+      const select = document.getElementById("filterGame");
+      const current = select.value;
+      const games = Array.from(new Set(allEvents.map((e) => e.game))).sort();
+      select.innerHTML = '<option value="">全部游戏</option>' +
+        games.map((g) => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join("");
+      if (games.includes(current)) select.value = current;
+    }
+
+    function renderEvents() {
+      const game = document.getElementById("filterGame").value;
+      const type = document.getElementById("filterType").value;
+      const status = document.getElementById("filterStatus").value;
+      const q = document.getElementById("filterSearch").value.trim().toLowerCase();
+      const reviewOnly = document.getElementById("filterReviewOnly").checked;
+
+      const filtered = allEvents.filter((ev) => {
+        if (game && ev.game !== game) return false;
+        if (type && ev.event_type !== type) return false;
+        if (status && ev.status !== status) return false;
+        if (reviewOnly && !ev.needs_review) return false;
+        if (q && !(`${ev.title} ${ev.game} ${ev.notes || ""}`).toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      const urgentCount = filtered.filter((ev) => ev.status === "active" && computeCountdown(ev).urgent).length;
+      const reviewCount = filtered.filter((ev) => ev.needs_review).length;
+      document.getElementById("statTotal").textContent = filtered.length;
+      document.getElementById("statUrgent").textContent = urgentCount;
+      document.getElementById("statReview").textContent = reviewCount;
+
+      const listEl = document.getElementById("eventList");
+      if (!filtered.length) {
+        listEl.innerHTML = '<div class="empty">暂无符合条件的活动</div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map((ev) => {
+        const cd = computeCountdown(ev);
+        const typeLabel = TYPE_LABELS[ev.event_type] || ev.event_type;
+        const typeCls = TYPE_LABELS[ev.event_type] ? `b-${ev.event_type}` : "b-status";
+        const cardCls = `event-card ${ev.status} ${cd.urgent && ev.status === "active" ? "urgent" : ""}`;
+        const muteText = ev.status === "muted" ? "取消静音" : "静音";
+        const nextMuteStatus = ev.status === "muted" ? "active" : "muted";
+        return `
+          <article class="${cardCls}">
+            <div class="event-top">
+              <div class="event-title-wrap">
+                <span class="badge b-game">${escapeHtml(ev.game)}</span>
+                <span class="badge ${typeCls}">${escapeHtml(typeLabel)}</span>
+                <span class="event-title">${escapeHtml(ev.title)}</span>
+                ${ev.status !== "active" ? `<span class="badge b-status">${STATUS_LABELS[ev.status] || ev.status}</span>` : ""}
+                ${ev.manual_locked ? '<span class="badge b-locked" title="已锁定，不会被自动同步覆盖">已锁定</span>' : ""}
+                ${ev.needs_review ? '<span class="badge b-review">待核对</span>' : ""}
+              </div>
+              <div class="countdown ${cd.cls}">${escapeHtml(cd.text)}</div>
+            </div>
+            <div class="event-meta">
+              <span>开始：${formatDateTime(ev.start_time)}</span>
+              <span>结束：${formatDateTime(ev.end_time)}</span>
+              <span>来源：${escapeHtml(ev.source_id)}</span>
+              ${ev.url ? `<a href="${escapeHtml(ev.url)}" target="_blank" rel="noopener">查看公告 ↗</a>` : ""}
+            </div>
+            ${ev.notes ? `<div class="event-notes">${escapeHtml(ev.notes)}</div>` : ""}
+            <div class="event-footer">
+              <span style="font-size:12px;color:var(--muted)">ID #${ev.id}</span>
+              <div class="event-btns">
+                <button class="btn btn-sm" onclick="openDetailModal(${ev.id})">提醒节点</button>
+                <button class="btn btn-sm" onclick="openEditModal(${ev.id})">编辑</button>
+                ${ev.status !== "done" ? `<button class="btn btn-sm" onclick="quickStatus(${ev.id}, 'done')">标记完成</button>` : `<button class="btn btn-sm" onclick="quickStatus(${ev.id}, 'active')">重新激活</button>`}
+                <button class="btn btn-sm" onclick="quickStatus(${ev.id}, '${nextMuteStatus}')">${muteText}</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteEvent(${ev.id}, '${escapeHtml(ev.title).replace(/'/g, "\\'")}')">删除</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function openEditModal(eventId = null) {
+      document.getElementById("editError").textContent = "";
+      const isEdit = eventId !== null;
+      document.getElementById("editModalTitle").textContent = isEdit ? `编辑活动 #${eventId}` : "新增活动";
+      document.getElementById("editExtraFlags").style.display = isEdit ? "block" : "none";
+
+      if (!isEdit) {
+        document.getElementById("editId").value = "";
+        document.getElementById("editGame").value = document.getElementById("filterGame").value || "";
+        document.getElementById("editType").value = "ingame_event";
+        document.getElementById("editTitle").value = "";
+        document.getElementById("editStart").value = "";
+        document.getElementById("editEnd").value = "";
+        document.getElementById("editUrl").value = "";
+        document.getElementById("editNotes").value = "";
+      } else {
+        const ev = allEvents.find((x) => x.id === eventId);
+        if (!ev) return;
+        document.getElementById("editId").value = ev.id;
+        document.getElementById("editGame").value = ev.game;
+        document.getElementById("editType").value = TYPE_LABELS[ev.event_type] ? ev.event_type : "ingame_event";
+        document.getElementById("editTitle").value = ev.title;
+        document.getElementById("editStart").value = toDatetimeLocalValue(ev.start_time);
+        document.getElementById("editEnd").value = toDatetimeLocalValue(ev.end_time);
+        document.getElementById("editUrl").value = ev.url || "";
+        document.getElementById("editNotes").value = ev.notes || "";
+        document.getElementById("editStatus").value = ev.status;
+        document.getElementById("editLocked").checked = true;
+        document.getElementById("editNeedsReview").checked = !!ev.needs_review;
+      }
+      openModal("editModal");
+    }
+
+    async function saveEvent(e) {
+      e.preventDefault();
+      const errEl = document.getElementById("editError");
+      const btn = document.getElementById("btnSaveEvent");
+      errEl.textContent = "";
+      const id = document.getElementById("editId").value;
+
+      const payload = {
+        game: document.getElementById("editGame").value.trim(),
+        event_type: document.getElementById("editType").value,
+        title: document.getElementById("editTitle").value.trim(),
+        start_time: fromDatetimeLocalValue(document.getElementById("editStart").value),
+        end_time: fromDatetimeLocalValue(document.getElementById("editEnd").value),
+        url: document.getElementById("editUrl").value.trim() || null,
+        notes: document.getElementById("editNotes").value.trim() || null,
+      };
+      if (id) {
+        payload.status = document.getElementById("editStatus").value;
+        payload.manual_locked = document.getElementById("editLocked").checked;
+        payload.needs_review = document.getElementById("editNeedsReview").checked;
+      }
+
+      btn.disabled = true;
+      try {
+        if (id) {
+          await apiFetch(`/events/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+          showToast(`已更新活动 #${id} 并重建提醒`, "success");
+        } else {
+          await apiFetch("/events", { method: "POST", body: JSON.stringify(payload) });
+          showToast("已新增活动并生成提醒", "success");
+        }
+        closeModal("editModal");
+        await loadEvents();
+      } catch (err) {
+        errEl.textContent = "保存失败：" + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function quickStatus(eventId, status) {
+      try {
+        await apiFetch(`/events/${eventId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status, manual_locked: true }),
+        });
+        showToast(`活动 #${eventId} 已更新为「${STATUS_LABELS[status] || status}」`, "success");
+        await loadEvents();
+      } catch (err) {
+        showToast("操作失败：" + err.message, "error");
+      }
+    }
+
+    async function deleteEvent(eventId, title) {
+      if (!confirm(`确定删除活动 #${eventId}「${title}」及其全部提醒吗？`)) return;
+      try {
+        await apiFetch(`/events/${eventId}`, { method: "DELETE" });
+        showToast(`已删除活动 #${eventId}`, "success");
+        await loadEvents();
+      } catch (err) {
+        showToast("删除失败：" + err.message, "error");
+      }
+    }
+
+    async function openDetailModal(eventId) {
+      document.getElementById("detailTitle").textContent = `加载活动 #${eventId}...`;
+      document.getElementById("detailMeta").textContent = "";
+      document.getElementById("detailBody").innerHTML = "";
+      openModal("detailModal");
+      try {
+        const data = await apiFetch(`/events/${eventId}`);
+        const ev = data.event;
+        const rems = data.reminders || [];
+        document.getElementById("detailTitle").textContent = `[${ev.game}] ${ev.title}`;
+        document.getElementById("detailMeta").textContent =
+          `开始：${formatDateTime(ev.start_time)} ｜ 结束：${formatDateTime(ev.end_time)}`;
+        if (!rems.length) {
+          document.getElementById("detailBody").innerHTML = '<p style="color:var(--muted)">暂无提醒节点</p>';
+          return;
+        }
+        document.getElementById("detailBody").innerHTML = `
+          <table class="reminder-table">
+            <thead>
+              <tr><th>规则</th><th>触发时间</th><th>状态</th><th>备注/错误</th></tr>
+            </thead>
+            <tbody>
+              ${rems.map((r) => `
+                <tr>
+                  <td><code>${escapeHtml(r.rule_key)}</code></td>
+                  <td>${formatDateTime(r.trigger_at)}</td>
+                  <td>${escapeHtml(REMINDER_STATUS_LABELS[r.status] || r.status)}</td>
+                  <td style="color:var(--muted)">${escapeHtml(r.last_error || (r.sent_at ? "发于 " + formatDateTime(r.sent_at) : "-"))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        document.getElementById("detailBody").innerHTML = `<p class="error-text">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    async function triggerSync() {
+      const btn = document.getElementById("btnSync");
+      btn.disabled = true;
+      btn.textContent = "同步中...";
+      try {
+        const rep = await apiFetch("/sync", { method: "POST" });
+        const inserted = rep.sources.reduce((a, s) => a + s.inserted, 0);
+        const updated = rep.sources.reduce((a, s) => a + s.updated, 0);
+        const failed = rep.sources.filter((s) => !s.ok).length;
+        showToast(
+          `同步完成：新增 ${inserted}，更新 ${updated}，清理 ${rep.cleaned_events}${failed ? `，失败源 ${failed}` : ""}`,
+          failed ? "error" : "success"
+        );
+        await Promise.all([loadEvents(), loadLatestSync()]);
+      } catch (err) {
+        showToast("同步失败：" + err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "立即同步";
+      }
+    }
+
+    async function loadQueueStatus() {
+      try {
+        const data = await apiFetch("/queue");
+        document.getElementById("statQueue").textContent = data.count;
+        const switchTxt = data.notifications_enabled ? "通知已开启" : "全局通知已暂停";
+        document.getElementById("statQueueSub").textContent = `${switchTxt} · ${data.digest_cron}`;
+        return data;
+      } catch {
+        return null;
+      }
+    }
+
+    async function openQueueModal() {
+      document.getElementById("queueMeta").textContent = "正在加载队列...";
+      document.getElementById("queuePreview").textContent = "";
+      openModal("queueModal");
+      const data = await loadQueueStatus();
+      if (!data) {
+        document.getElementById("queueMeta").textContent = "加载失败";
+        return;
+      }
+      document.getElementById("queueMeta").textContent =
+        `通知总开关：${data.notifications_enabled ? "开启" : "关闭"} ｜ 模式：${data.mode} ｜ 定时汇总：${data.digest_cron} ｜ 当前队列：${data.count} 条`;
+      if (!data.count) {
+        document.getElementById("queuePreview").textContent = "当前待发送队列为空。";
+      } else {
+        document.getElementById("queuePreview").textContent = `${data.preview_title}\n\n${data.preview_body}`;
+      }
+    }
+
+    async function triggerDispatch() {
+      const btn = document.getElementById("btnDispatch");
+      btn.disabled = true;
+      try {
+        const rep = await apiFetch("/dispatch", { method: "POST" });
+        if (!rep.notifications_enabled) {
+          showToast(`全局通知开关已关闭（当前新入队 ${rep.queued} 条，未外发）`, "info");
+        } else if (rep.mode === "digest") {
+          showToast(
+            rep.digest_messages_sent > 0
+              ? `已合并发送 1 条汇总通知（包含 ${rep.sent} 项提醒）`
+              : `当前待发送队列为空（新检查 ${rep.checked}，跳过 ${rep.skipped}）`,
+            rep.failed ? "error" : "success"
+          );
+        } else {
+          showToast(`检查 ${rep.checked} 条：已发 ${rep.sent}，跳过 ${rep.skipped}，失败 ${rep.failed}`, rep.failed ? "error" : "success");
+        }
+        await loadQueueStatus();
+      } catch (err) {
+        showToast("推送失败：" + err.message, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function triggerTestNotify() {
+      try {
+        const rep = await apiFetch("/notify/test", { method: "POST", body: JSON.stringify({}) });
+        const fails = (rep.results || []).filter((r) => !r.ok);
+        if (fails.length) {
+          showToast("部分通道测试失败：" + fails.map((f) => `${f.notifier_id}: ${f.error}`).join("; "), "error");
+        } else {
+          showToast("测试通知已发送，请检查 ntfy / Bark", "success");
+        }
+      } catch (err) {
+        showToast("测试通知失败：" + err.message, "error");
+      }
+    }
+
+    async function triggerCleanup() {
+      if (!confirm("确定按配置清理已过期的历史活动吗？")) return;
+      try {
+        const rep = await apiFetch("/cleanup", { method: "POST" });
+        showToast(`已清理 ${rep.deleted} 条过期活动（保留天数：${rep.retention_days}）`, "success");
+        await loadEvents();
+      } catch (err) {
+        showToast("清理失败：" + err.message, "error");
+      }
+    }
+
+    checkAuthAndBoot();
+  </script>
+</body>
+</html>
